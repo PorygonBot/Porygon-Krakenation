@@ -88,6 +88,7 @@ let killer = "";
 let victim = "";
 let killJson = {};
 let deathJson = {};
+let replay = ""; //TODO implement replay capabilities in the bot (this is possible)
 //when the websocket sends a message
 websocket.on("message", async function incoming(data) {
     let realdata = data.split("\n");
@@ -112,8 +113,10 @@ websocket.on("message", async function incoming(data) {
         let linenew = line.substring(1);
         let parts = linenew.split("|");
 
-        if (line.startsWith(`battle`))
-            battlelink = line;
+        if (linenew.startsWith(`battle`)) { //TODO fix battlelink thing
+            outBattlelink = line;
+            console.log(line);
+        }
 
         else if (linenew.startsWith(`switch`)) {
             if (linenew.includes("p1a")) p1a = parts[2].split(",")[0];
@@ -154,6 +157,9 @@ websocket.on("message", async function incoming(data) {
                 deathJson[victim] = 1;
             else
                 deathJson[victim]++;
+            
+            //TODO make it so that Alakazam and Mega Alakazam are the same mon
+            //TODO make it so that the player whose pokemon just killed/died is part of the key
         }
 
         //|win|infernapeisawesome
@@ -166,78 +172,32 @@ websocket.on("message", async function incoming(data) {
             console.log(`${loser} lost!`);
 
             //updating the google sheet accordingly
-            let wintablenameArr = await getTableId(winner);
-            let winSpreadsheetId = wintablenameArr[0];
-            let winTableName = wintablenameArr[1];
-            let winPokeInfo = await getPokemonInfo(winSpreadsheetId, winTableName);
-
-            let losetablenameArr = await getTableId(loser);
-            let loseSpreadsheetId = losetablenameArr[0];
-            let loseTableName = losetablenameArr[1];
-            let losePokeInfo = await getPokemonInfo(loseSpreadsheetId, loseTableName);
+            let spreadsheetId = "1YU_lM_mBRuwa2NGk6tgSrWG1S70Stvd_7kThH7X-ATc";
+            let tableName = "BattleInput";
 
             //creating requests to update spreadsheet with new info
-            let winRequest = {
-                "spreadsheetId": winSpreadsheetId,
-                "range": `${winTableName}!C9:I19`,
+            let request = {
+                "spreadsheetId": spreadsheetId,
+                "range": `${tableName}!C9:I19`,
                 "includeValuesInResponse": false,
                 "responseValueRenderOption": "FORMATTED_VALUE",
                 "valueInputOption": "USER_ENTERED",
                 "resource": {
-                    "range": `${winTableName}!C9:I19`,
-                    "values": winPokeInfo.data.values
+                    "range": `${tableName}!A2:AN2`,
+                    "values": [
+                        [winner, loser, winner, replay
+                        //TODO add winner mon info
+                        //TODO add loser mon info
+                        ]
+                    ]
                 },
                 "auth": client
             };
-            let loseRequest = {
-                "spreadsheetId": loseSpreadsheetId,
-                "range": `${loseTableName}!C9:I19`,
-                "includeValuesInResponse": false,
-                "responseValueRenderOption": "FORMATTED_VALUE",
-                "valueInputOption": "USER_ENTERED",
-                "resource": {
-                    "range": `${loseTableName}!C9:I19`,
-                    "values": losePokeInfo.data.values
-                },
-                "auth": client
-            };
-            console.log("winrequest before: ", winRequest.resource.values);
-            console.log("loserequest before: ", loseRequest.resource.values);
-            for (var i = 0; i < 10; i++) {
-                let winPoke = winPokeInfo.data.values[i][1];
-                let losePoke = losePokeInfo.data.values[i][1];
-                //updating Games Played and Games Won
-                if (winPoke in killJson || winPoke in deathJson) {
-                    winRequest.resource.values[i][3] = (parseInt(winRequest.resource.values[i][3]) + 1).toString();
-                    winRequest.resource.values[i][4] = (parseInt(winRequest.resource.values[i][4]) + 1).toString();
-                }
-                if (losePoke in killJson || losePoke in deathJson) {
-                    loseRequest.resource.values[i][3] = (parseInt(loseRequest.resource.values[i][3]) + 1).toString();
-                }
+            console.log("request before: ", request.resource.values);
 
-                //updating winner pokemon info
-                if (killJson[winPoke] >= 0)
-                    winRequest.resource.values[i][5] = (killJson[winPoke] + parseInt(winRequest.resource.values[i][5])).toString();
-                if (deathJson[winPoke] >= 0)
-                    winRequest.resource.values[i][6] = (deathJson[winPoke] + parseInt(winRequest.resource.values[i][6])).toString();
-                //updating loser pokemon info
-                if (killJson[losePoke] >= 0)
-                    loseRequest.resource.values[i][5] = (killJson[losePoke] + parseInt(loseRequest.resource.values[i][5])).toString();
-                if (deathJson[losePoke] >= 0)
-                    loseRequest.resource.values[i][6] = (deathJson[losePoke] + parseInt(loseRequest.resource.values[i][6])).toString();
-            }
-
-            console.log("killjson: ", killJson);
-            console.log("deathjson: ", deathJson);
-            console.log("winrequest after: ", winRequest.resource.values);
-            console.log("loserequest after: ", loseRequest.resource.values);
             //updating pokemon info
-            let placholder1 = await updatePokemonInfo(winRequest);
-            console.log("Winner update: ", placholder1);
-            setTimeout(async function() {
-                placholder1 = await updatePokemonInfo(loseRequest);
-                console.log("Loser update: ", placholder1);
-            }, (500));
+            let placholder1 = await updatePokemonInfo(request);
+            console.log("request update: ", placholder1);
 
             //resetting after every game
             dataArr = [];
@@ -251,6 +211,7 @@ websocket.on("message", async function incoming(data) {
             victim = "";
             killJson = {};
             deathJson = {};
+            replay = "";
         }
     }
 });
@@ -289,7 +250,6 @@ bot.on("message", async message => {
     //checks for help command
     if (msgStr.toLowerCase() === `${prefix} help`) {
         let bicon = bot.user.displayAvatarURL; 
-        let hicon = bot.fetchUser(`399021249667399722`).avatarURL;
         let helpEmbed = new Discord.RichEmbed()
         .setTitle("Porygon Help")
         .setThumbnail(bicon)
@@ -326,88 +286,9 @@ const sheets = google.sheets({
     version: 'v4',
     auth: api_key
 });
-async function getTableId(showdownName) {
-    //"showdownName":"SHEETNAME"
-    const majors = {
-        "beastnugget35": "DS",
-        "e24mcon": "BBP",
-        "Killer Mojo": "LLL",
-        "JDMR98": "JDMR",
-        "SpooksLite": "DTD",
-        "Talal_23": "SoF",
-        "I am TheDudest": "TDD",
-        "M UpSideDown W": "USD",
-        "CinnabarCyndaquil": "CCQ",
-        "pop5isaac": "ELA",
-        "Vienna Vullabies": "VVB",
-        "tiep123": "ORR",
-        "LimitBroKe": "MCM",
-        "a7x2567": "NYP",
-        "jelani": "Lani",
-        "pickle brine": "PPK"
-    }
-    const minors = {
-            "GableGames": "MWM",
-            "Mother Runerussia": "RRG",
-            "Fate LVL": "LVL",
-            "Aaron12pkmn": "LSS",
-            "Wolf iGL": "CKM",
-            "JonnyGoldApple": "UUB",
-            "Mexicanshyguy": "ARD",
-            "SnooZEA": "DDL",
-            "joey34": "DSY",
-            "Gen 4 elitist": "G4E",
-            "HalluNasty": "KCC",
-            "Hi I'm WoW": "WOW",
-            "ChampionDragonites": "ETD",
-            "infernapeisawesome": "SSR",
-            "metsrule97": "HT",
-            "Darkkstar": "BBF",
-            "dominicann": "MMT",
-            "RetroLikesMemes": "GRG"
-        }
-        //finding out the name of the Table as well as if the league is Minors or Majors
-    let tableName = "";
-    let isMajor = false;
-    if (majors[showdownName]) {
-        isMajor = true;
-        tableName = majors[showdownName];
-    } else if (minors[showdownName]) {
-        isMajor = false;
-        tableName = minors[showdownName];
-    } else {
-        return ["No SheetID", "Invalid Showdown name"];
-    }
-
-    //Gets info about the sheet
-    let spreadsheetId = isMajor ? "1Z0lFg8MFYONpMLia1jrAv9LC5MSJOJByRs3LDKxV0eI" : "1U85VJem_HDDXNCTB8954R1oCs9-ls6W0Micn2q6P-kE";
-    let list = [spreadsheetId, tableName];
-    return list;
-}
-
-async function getPokemonInfo(spreadsheetId, tableName) {
-    let request = {
-        "auth": client,
-        "spreadsheetId": spreadsheetId,
-        "range": `${tableName}!C9:I19`
-    }
-
-    let pokemonJson = await new Promise((resolve, reject) => {
-        sheets.spreadsheets.values.get(request, function(err, response) {
-            if (err) {
-                reject(err)
-            } else {
-                resolve(response)
-            }
-        });
-    });
-
-    return pokemonJson;
-}
-
 async function updatePokemonInfo(request) {
     let placeholder = await new Promise((resolve, reject) => {
-        sheets.spreadsheets.values.update(request, function(err, response) {
+        sheets.spreadsheets.values.append(request, function(err, response) {
             if (err) {
                 reject(err)
             } else {
