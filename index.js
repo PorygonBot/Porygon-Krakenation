@@ -89,6 +89,7 @@ let victim = "";
 let killJson = {};
 let deathJson = {};
 let replay = ""; //TODO implement replay capabilities in the bot (this is possible)
+let turns = 0;
 //when the websocket sends a message
 websocket.on("message", async function incoming(data) {
     let realdata = data.split("\n");
@@ -115,7 +116,11 @@ websocket.on("message", async function incoming(data) {
 
         if (linenew.startsWith(`battle`)) { //TODO fix battlelink thing
             outBattlelink = line;
-            console.log(line);
+            //console.log(linenew);
+        }
+
+        else if (linenew.startsWith(`turn`)) {
+            turns++;
         }
 
         else if (linenew.startsWith(`switch`)) {
@@ -141,9 +146,29 @@ websocket.on("message", async function incoming(data) {
             if (parts[1].substring(0, 3) === "p1a") {
                 killer = p2a;
                 victim = p1a;
-            } else {
+            } 
+            else {
                 killer = p1a;
                 victim = p2a;
+            }
+            
+            //makes sure megas count for the same number of kills/deaths
+            if (killer.endsWith(`-Mega`)) {
+                
+                console.log("killJson before: ", killJson);
+                if (!killJson[killer]) {
+                    killJson[killer] = killJson[killer.split("-")[0]];
+                    delete killJson[killer.split("-")[0]];
+                }
+                console.log("killJson after: ", killJson);
+            }
+            if (victim.endsWith(`-Mega`)){
+                console.log("deathJson before:", deathJson);
+                if (!killJson[killer]) {
+                    killJson[killer] = killJson[killer.split("-")[0]];
+                    delete killJson[killer.split("-")[0]];
+                }
+                console.log("deathJson after:", deathJson);
             }
 
             console.log(`${killer} killed ${victim}`);
@@ -157,9 +182,6 @@ websocket.on("message", async function incoming(data) {
                 deathJson[victim] = 1;
             else
                 deathJson[victim]++;
-            
-            //TODO make it so that Alakazam and Mega Alakazam are the same mon
-            //TODO make it so that the player whose pokemon just killed/died is part of the key
         }
 
         //|win|infernapeisawesome
@@ -178,25 +200,35 @@ websocket.on("message", async function incoming(data) {
             //creating requests to update spreadsheet with new info
             let request = {
                 "spreadsheetId": spreadsheetId,
-                "range": `${tableName}!C9:I19`,
+                "range": `${tableName}!A2:AO2`,
                 "includeValuesInResponse": false,
                 "responseValueRenderOption": "FORMATTED_VALUE",
                 "valueInputOption": "USER_ENTERED",
                 "resource": {
-                    "range": `${tableName}!A2:AN2`,
+                    "range": `${tableName}!A2:AO2`,
                     "values": [
-                        [winner, loser, winner, replay
-                        //TODO add winner mon info
-                        //TODO add loser mon info
+                        [players[0], players[1], winner, replay,
+                        pokes1[0], killJson[pokes1[0]], deathJson[pokes1[0]],
+                        pokes1[1], killJson[pokes1[1]], deathJson[pokes1[1]],
+                        pokes1[2], killJson[pokes1[2]], deathJson[pokes1[2]],
+                        pokes1[3], killJson[pokes1[3]], deathJson[pokes1[3]],
+                        pokes1[4], killJson[pokes1[4]], deathJson[pokes1[4]],
+                        pokes1[5], killJson[pokes1[5]], deathJson[pokes1[5]],
+                        pokes2[0], killJson[pokes2[0]], deathJson[pokes2[0]],
+                        pokes2[1], killJson[pokes2[1]], deathJson[pokes2[1]],
+                        pokes2[2], killJson[pokes2[2]], deathJson[pokes2[2]],
+                        pokes2[3], killJson[pokes2[3]], deathJson[pokes2[3]],
+                        pokes2[4], killJson[pokes2[4]], deathJson[pokes2[4]],
+                        pokes2[5], killJson[pokes2[5]], deathJson[pokes2[5]],
+                        turns
                         ]
                     ]
                 },
                 "auth": client
             };
-            console.log("request before: ", request.resource.values);
 
             //updating pokemon info
-            let placholder1 = await updatePokemonInfo(request);
+            let placholder1 = await addPokemonInfo(request);
             console.log("request update: ", placholder1);
 
             //resetting after every game
@@ -212,6 +244,7 @@ websocket.on("message", async function incoming(data) {
             killJson = {};
             deathJson = {};
             replay = "";
+            turns = 0;
         }
     }
 });
@@ -227,10 +260,7 @@ bot.on("message", async message => {
 
     if (channel.type === "dm") return;
     else if (
-        channel.id === "658057669617254411" ||
-        channel.id === "658058064154329089" ||
-        channel.id === "657647109926813708" ||
-        channel.id === "603067258163560459"
+        channel.id === "650535162073055303"
     ) {
         //separates given message into its parts
         let urls = Array.from(getUrls(msgStr)); //This is because getUrls returns a Set
@@ -286,7 +316,7 @@ const sheets = google.sheets({
     version: 'v4',
     auth: api_key
 });
-async function updatePokemonInfo(request) {
+async function addPokemonInfo(request) {
     let placeholder = await new Promise((resolve, reject) => {
         sheets.spreadsheets.values.append(request, function(err, response) {
             if (err) {
