@@ -86,9 +86,10 @@ let pokes1 = [];
 let pokes2 = [];
 let killer = "";
 let victim = "";
-let killJson = {};
-let deathJson = {};
-let replay = ""; //TODO implement replay capabilities in the bot (this is possible)
+let killJsonp1 = {};
+let killJsonp2 = {};
+let deathJsonp1 = {};
+let deathJsonp2 = {};
 let turns = 0;
 //when the websocket sends a message
 websocket.on("message", async function incoming(data) {
@@ -136,52 +137,50 @@ websocket.on("message", async function incoming(data) {
 
         //|poke|p1|Hatterene, F|
         else if (linenew.startsWith(`poke`)) {
-            let pokemon = parts[2].split(",")[0];
-            if (parts[1] === "p1") pokes1.push(pokemon);
-            else if (parts[1] === "p2") pokes2.push(pokemon);
+            let pokemon = parts[2].split(",")[0].split("-")[0];
+            if (parts[1] === "p1") {
+                pokes1.push(pokemon);
+                killJsonp1[pokemon] = 0;
+                deathJsonp1[pokemon] = 0;
+            }
+            else if (parts[1] === "p2") {
+                pokes2.push(pokemon);
+                killJsonp2[pokemon] = 0;
+                deathJsonp2[pokemon] = 0;
+            }
+        } 
 
-            killJson[pokemon] = 0;
-            deathJson[pokemon] = 0;
-        } else if (linenew.startsWith("faint")) {
+        else if (linenew.startsWith("faint")) {
             if (parts[1].substring(0, 3) === "p1a") {
-                killer = p2a;
-                victim = p1a;
+                killer = p2a.split("-")[0];
+                victim = p1a.split("-")[0];
+                //updating killer info in the JSON
+                if (!killJsonp2[killer])
+                    killJsonp2[killer] = 1;
+                else
+                    killJsonp2[killer]++;
+                //updating victim info in the JSON
+                if (!deathJsonp1[victim])
+                    deathJsonp1[victim] = 1;
+                else 
+                    deathJsonp1[victim]++;
             } 
             else {
-                killer = p1a;
-                victim = p2a;
+                killer = p1a.split("-")[0];
+		        victim = p2a.split("-")[0];
+                //updating killer info in the JSON
+                if (!killJsonp1[killer])
+                    killJsonp1[killer] = 1;
+                else
+                    killJsonp1[killer]++;
+                //updating victim info in the JSON
+                if (!deathJsonp2[victim])
+                    deathJsonp2[victim] = 1;
+                else 
+                    deathJsonp2[victim]++;
             }
-            
-            //makes sure megas count for the same number of kills/deaths
-            if (killer.endsWith(`-Mega`)) {
-                
-                console.log("killJson before: ", killJson);
-                if (!killJson[killer]) {
-                    killJson[killer] = killJson[killer.split("-")[0]];
-                    delete killJson[killer.split("-")[0]];
-                }
-                console.log("killJson after: ", killJson);
-            }
-            if (victim.endsWith(`-Mega`)){
-                console.log("deathJson before:", deathJson);
-                if (!killJson[killer]) {
-                    killJson[killer] = killJson[killer.split("-")[0]];
-                    delete killJson[killer.split("-")[0]];
-                }
-                console.log("deathJson after:", deathJson);
-            }
-
-            console.log(`${killer} killed ${victim}`);
-            //updating killer info in the JSON
-            if (!killJson[killer])
-                killJson[killer] = 1;
-            else
-                killJson[killer]++;
-            //updating victim info in the JSON
-            if (!deathJson[victim])
-                deathJson[victim] = 1;
-            else
-                deathJson[victim]++;
+	
+	        console.log(`${killer} killed ${victim}.`);
         }
 
         //|win|infernapeisawesome
@@ -208,18 +207,18 @@ websocket.on("message", async function incoming(data) {
                     "range": `${tableName}!A2:AO2`,
                     "values": [
                         [players[0], players[1], winner, replay,
-                        pokes1[0], killJson[pokes1[0]], deathJson[pokes1[0]],
-                        pokes1[1], killJson[pokes1[1]], deathJson[pokes1[1]],
-                        pokes1[2], killJson[pokes1[2]], deathJson[pokes1[2]],
-                        pokes1[3], killJson[pokes1[3]], deathJson[pokes1[3]],
-                        pokes1[4], killJson[pokes1[4]], deathJson[pokes1[4]],
-                        pokes1[5], killJson[pokes1[5]], deathJson[pokes1[5]],
-                        pokes2[0], killJson[pokes2[0]], deathJson[pokes2[0]],
-                        pokes2[1], killJson[pokes2[1]], deathJson[pokes2[1]],
-                        pokes2[2], killJson[pokes2[2]], deathJson[pokes2[2]],
-                        pokes2[3], killJson[pokes2[3]], deathJson[pokes2[3]],
-                        pokes2[4], killJson[pokes2[4]], deathJson[pokes2[4]],
-                        pokes2[5], killJson[pokes2[5]], deathJson[pokes2[5]],
+                        pokes1[0], killJsonp1[pokes1[0]], deathJsonp1[pokes1[0]],
+                        pokes1[1], killJsonp1[pokes1[1]], deathJsonp1[pokes1[1]],
+                        pokes1[2], killJsonp1[pokes1[2]], deathJsonp1[pokes1[2]],
+                        pokes1[3], killJsonp1[pokes1[3]], deathJsonp1[pokes1[3]],
+                        pokes1[4], killJsonp1[pokes1[4]], deathJsonp1[pokes1[4]],
+                        pokes1[5], killJsonp1[pokes1[5]], deathJsonp1[pokes1[5]],
+                        pokes1[0], killJsonp2[pokes1[0]], deathJsonp2[pokes1[0]],
+                        pokes1[1], killJsonp2[pokes1[1]], deathJsonp2[pokes1[1]],
+                        pokes1[2], killJsonp2[pokes1[2]], deathJsonp2[pokes1[2]],
+                        pokes1[3], killJsonp2[pokes1[3]], deathJsonp2[pokes1[3]],
+                        pokes1[4], killJsonp2[pokes1[4]], deathJsonp2[pokes1[4]],
+                        pokes1[5], killJsonp2[pokes1[5]], deathJsonp2[pokes1[5]],
                         turns
                         ]
                     ]
